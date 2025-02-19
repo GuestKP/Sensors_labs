@@ -23,18 +23,17 @@ class CanBus:
         baudrate: int = 115200,
         bitrate: int = 1000000
     ) -> None:
+        self.bus = can.Bus(interface='slcan', channel='COM10', bitrate=1e6)
+        return
         self.port = subprocess.getoutput("ls /dev/ttyACM*") if port is None else port
-        print(f'init port is {self.port}')
         self.channel = channel
         self.bustype = bustype
         self.baudrate = baudrate
         self.bitrate = bitrate
         self.open()
-        #self.bus = can.interface.Bus(channel=channel, bustype=bustype)
-        self.bus = can.Bus(interface='slcan', channel='COM10', bitrate=1e6)
+        self.bus = can.interface.Bus(channel=channel, bustype=bustype)
 
     def open(self) -> None:
-        return
         os.system(f'sudo ifconfig {self.channel} down')
         os.system(f'sudo slcand -o -c -s8 -S {self.baudrate} {self.port} {self.channel}')
         os.system(f'sudo ifconfig {self.channel} down')

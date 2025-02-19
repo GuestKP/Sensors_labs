@@ -5,7 +5,7 @@ void setup() {
 }
 
 float cur = 0;
-float k = 0.2;
+float k = 0.4;
 
 void loop() {
   cur = (float)analogRead(A0) * k + (cur * (1. - k));

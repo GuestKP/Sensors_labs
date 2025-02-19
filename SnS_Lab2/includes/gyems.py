@@ -87,7 +87,6 @@ class Gyems:
         :return: Nothing
         :doc-author: Trelent
         """
-        print(self.driver.bus.channel_info)
         self.driver.motor_running()
 
         temp, voltage, error_code = self.driver.clear_motor_error()
@@ -265,7 +264,7 @@ class Gyems:
         self.state["phase_a"] = phase_a
         self.state["phase_b"] = phase_b
         self.state["phase_c"] = phase_c
-        self.state["speed"] = speed / 10
+        self.state["speed"] = speed
         self.state["angle"] = angle
         self.state["encoder"] = encoder if encoder is not None else self.encoder
         self.state["rotations"] = self.encoder_steps
