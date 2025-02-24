@@ -5,29 +5,37 @@ from collections import deque
 from datetime import datetime
 
 import numpy as np
-from scipy.signal import iirnotch, lfilter, butter
-from scipy.fft import rfft
+from scipy.signal import iirnotch, lfilter
 
-ard = serial.Serial('/dev/ttyACM1', 115200)
+ard = serial.Serial('COM9', 115200)
 
 file = open('log-'+datetime.now().strftime("%Y-%m-%d-%H-%M-%S")+'.txt', 'w')
 
-# Data buffer for real-time plotting
-data_buffer_size = 1000  # Number of data points to display
-raw_data_buffer = deque(maxlen=data_buffer_size)
-filtered_data_buffer = [0]*data_buffer_size#deque(maxlen=data_buffer_size)
+data_buffer_size = 1000
+raw_data_buffer = [0]*data_buffer_size
+filtered_data_buffer = [0]*data_buffer_size 
+std_buffer = [0]*data_buffer_size
+end_buffer = [0]*data_buffer_size
 
-b_notch, a_notch = iirnotch(fs=1000, Q=10, w0=50)
-b_notch2, a_notch2 = iirnotch(fs=1000, Q=10, w0=63)
+period = 1 # ms
+num_readings_calibrate = 400
+b50, a50 = iirnotch(fs=1000/period, Q=10, w0=50)
+b100, a100 = iirnotch(fs=1000/period, Q=10, w0=100)
+b_filt, a_filt = np.convolve(b50, b100), np.convolve(a50, a100)
+k = 0.2
+data_time = 0
 
-# Create the figure and axis for plotting
+
+meanval = 0
+target = 0
 fig, ax = plt.subplots()
-line_raw, = ax.plot([], [], lw=2, label="Raw Data")
-line_filtered, = ax.plot([], [], lw=2, label="Filtered Data", color='orange')
-ax.set_ylim(-10, 1030)  # Adjust based on your expected data range
+line_raw, = ax.plot([], [], lw=2, label="Raw")
+line_filtered, = ax.plot([], [], lw=2, label="Filtered", color='orange')
+line_std, = ax.plot([], [], lw=2, label="third", color='green')
+ax.set_ylim(-10, 1030)
 ax.set_xlim(0, data_buffer_size)
-ax.set_title("Real-Time Serial Data Plot with Notch Filter")
-ax.set_xlabel("Time")
+ax.set_title("Real-Time Serial Data Plot")
+ax.set_xlabel("Reading idx")
 ax.set_ylabel("Value")
 ax.legend()
 
@@ -35,37 +43,55 @@ ax.legend()
 def init():
     line_raw.set_data([], [])
     line_filtered.set_data([], [])
-    return line_raw, line_filtered
+    line_std.set_data([], [])
+    return line_raw, line_filtered, line_std
+
+
+cur_on = 0 # "peak start" time
+last_seen = 0 # "peak end" time
+direction = 1
+update = False
+update_dir = False
+
+def is_on(time, ping_to_off=200):
+    return (time - last_seen) < ping_to_off
+        
+end_value = 0
 
 # Function to update the plot
 def update(frame):
-    global filtered_data_buffer
+    global filtered_data_buffer, raw_data_buffer, std_buffer, meanval, data_time, num_readings_calibrate, end_buffer, end_value
     try:
         # Read a line of data from the serial port
         while ard.in_waiting:
             data = ard.readline().decode('utf-8', errors='replace').strip()
         
-        # Check if data is valid (non-empty and numeric)
+            # Check if data is valid (non-empty and numeric)
             if data:
                 try:
                     value = float(data)
                     file.write(f'{value}\n')
-                    raw_data_buffer.append(value)
-                    filtered_data_buffer = filtered_data_buffer[1:] + [(sum(filtered_data_buffer[-4:]) + value) / 5]
+                    raw_data_buffer = raw_data_buffer[1:] + [value]
+                    filtered_data_buffer = lfilter(b_filt, a_filt, raw_data_buffer)
 
-
-                    '''filtered_data_buffer = lfilter(b_notch, a_notch, raw_data_buffer)
-                    filtered_data_buffer = lfilter(b_notch2, a_notch2, filtered_data_buffer)
-                    filtered_data_buffer = np.abs(rfft(filtered_data_buffer)) / 100'''
+                    if data_time < num_readings_calibrate * period:
+                        meanval += filtered_data_buffer[-1]
+                    elif data_time == num_readings_calibrate * period:
+                        meanval /= num_readings_calibrate
+                    else:
+                        end_value = end_value*(1-k)+ abs(filtered_data_buffer[-1] - meanval)*k
+                        end_buffer = end_buffer[1:] + [end_value]
+                    data_time += period
                 except ValueError:
                     pass
                 
     except serial.SerialException as e:
         print(f"Serial read error: {e}")
+
     line_raw.set_data(range(len(raw_data_buffer)), raw_data_buffer)
-    line_filtered.set_data(range(len(filtered_data_buffer)), filtered_data_buffer)
+    line_filtered.set_data(range(len(end_buffer)), end_buffer)
     
-    return line_raw, line_filtered
+    return line_raw, line_filtered, line_std
 
 ani = animation.FuncAnimation(fig, update, init_func=init, blit=True, interval=1)
 plt.show()

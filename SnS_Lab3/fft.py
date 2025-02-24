@@ -3,8 +3,8 @@ import matplotlib.pyplot as plt
 from os import listdir
 import numpy as np
 
-print(sorted(listdir('./'))[-1])
-with open(sorted(listdir('./'))[-1], 'r') as f:
+print(sorted(listdir('./SnS_Lab3/'))[-1])
+with open('SnS_Lab3\log-2025-02-24-17-58-39_noise.txt', 'r') as f:
     data = [float(i) for i in f.readlines()]
 
 dfft = np.abs(rfft(data[-1000:]))
