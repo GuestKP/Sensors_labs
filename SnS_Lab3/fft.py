@@ -3,10 +3,19 @@ import matplotlib.pyplot as plt
 from os import listdir
 import numpy as np
 
-print(sorted(listdir('./SnS_Lab3/'))[-1])
-with open('SnS_Lab3\log-2025-02-24-17-58-39_noise.txt', 'r') as f:
+folder = './SnS_Lab3/'
+entries = sorted(listdir(folder))
+print(*[f'[{i}] {name}' for i, name in enumerate(entries)], sep='\n')
+idx = int(input("Select file: "))
+with open(folder+entries[idx], 'r') as f:
     data = [float(i) for i in f.readlines()]
+
+
+plt.plot(range(len(data)), data)
+plt.show()
 
 dfft = np.abs(rfft(data[-1000:]))
 plt.plot(range(len(dfft)), dfft)
+plt.xlabel('Frequency, Hz')
+plt.ylabel('Magnitude, units^2')
 plt.show()
